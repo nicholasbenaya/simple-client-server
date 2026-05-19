@@ -15,7 +15,7 @@ else:
 port_input = input("Masukkan Port Server (misal 5000): ").strip()
 SERVER_PORT = int(port_input) if port_input.isdigit() else 5000
 
-# --- Meminta Username dari Pengguna ---
+# Meminta Username
 while True:
     USERNAME = input("Masukkan Username Anda: ").strip()
     if USERNAME:
@@ -26,6 +26,38 @@ print(f"\n[*] Menyiapkan koneksi ke {SERVER_HOST}:{SERVER_PORT}...")
 
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+# --- PERUBAHAN UTAMA: VALIDASI KONEKSI (HANDSHAKE) ---
+print("Menyambungkan ke server... (Menunggu konfirmasi)")
+
+try:
+    # 1. Kirim pesan perkenalan (Username)
+    client_socket.sendto(USERNAME.encode('utf-8'), (SERVER_HOST, SERVER_PORT))
+    
+    # 2. Beri waktu tunggu maksimal 5 detik untuk balasan server
+    client_socket.settimeout(5.0) 
+    
+    # 3. Tunggu pesan konfirmasi dari server (bisa pesan ruang tunggu atau disetujui)
+    message, _ = client_socket.recvfrom(1024)
+    pesan_awal = message.decode('utf-8')
+    print(f"\n{pesan_awal}")
+    
+    if "[DITOLAK]" in pesan_awal:
+        os._exit(0)
+        
+    # 4. Jika berhasil mendapat balasan, matikan batas waktu agar bisa chatting normal
+    client_socket.settimeout(None) 
+    
+except socket.timeout:
+    # Jika 5 detik berlalu tanpa balasan, berarti Firewall memblokir atau IP salah
+    print("\n[!] Gagal terhubung: Server tidak merespons.")
+    print("[!] Pastikan IP benar dan Firewall di laptop Server telah dimatikan/diizinkan.")
+    os._exit(1)
+except Exception as e:
+    print(f"\n[!] Error jaringan: {e}")
+    os._exit(1)
+# -----------------------------------------------------
+
+# Fungsi pendengar pesan lanjutan (setelah koneksi awal berhasil)
 def receive_messages():
     while True:
         try:
@@ -39,18 +71,10 @@ def receive_messages():
                 os._exit(0)
                 
         except Exception as e:
-            print(f"\n[!] Terputus dari server atau terjadi error: {e}")
+            print(f"\n[!] Terputus dari server atau terjadi error.")
             os._exit(1) 
 
-print("Menyambungkan ke server...")
-
-try:
-    # --- Perubahan: Mengirim Username sebagai paket pertama ---
-    client_socket.sendto(USERNAME.encode('utf-8'), (SERVER_HOST, SERVER_PORT))
-except Exception as e:
-    print(f"[!] Gagal mengirim pesan awal. Error: {e}")
-    os._exit(1)
-
+# Jalankan thread pendengar
 receive_thread = threading.Thread(target=receive_messages)
 receive_thread.daemon = True
 receive_thread.start()
@@ -60,7 +84,6 @@ print("Ketik pesan Anda dan tekan Enter. Ketik 'keluar' untuk berhenti.\n")
 
 while True:
     try:
-        # Tampilan input disesuaikan dengan Username
         pesan_keluar = input(f"[{USERNAME}]> ")
         
         if pesan_keluar.lower() == 'keluar':
@@ -68,12 +91,9 @@ while True:
             client_socket.close()
             os._exit(0) 
             
-        if pesan_keluar.strip(): # Hanya kirim jika pesan tidak kosong
+        if pesan_keluar.strip(): 
             client_socket.sendto(pesan_keluar.encode('utf-8'), (SERVER_HOST, SERVER_PORT))
-        
-    except KeyboardInterrupt:
-        print("\nKeluar secara paksa...")
-        os._exit(0)
+            
     except Exception as e:
         print(f"\n[!] Error Pengiriman: {e}")
         os._exit(1)
