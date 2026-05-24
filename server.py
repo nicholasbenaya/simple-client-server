@@ -62,21 +62,35 @@ def jalankan_server():
             message_bytes, client_address = server_socket.recvfrom(1024)
             pesan_teks = message_bytes.decode('utf-8')
             
-            # 1. JIKA KLIEN SUDAH TERDAFTAR (Ini adalah pesan obrolan)
+            # 1. JIKA KLIEN SUDAH TERDAFTAR (Ini adalah pesan obrolan atau sinyal keluar)
             if client_address in clients:
                 pengirim = clients[client_address]
-                pesan_lengkap = f"[{pengirim}]: {pesan_teks}"
                 
-                # Monitoring Traffic
-                klien_lain = len(clients) - 1
-                if klien_lain > 0:
-                    print(f"\n[Traffic] Pesan dari {pengirim} diteruskan ke {klien_lain} klien.")
+                # --- TAMBAHAN: Deteksi Sinyal Keluar ---
+                if pesan_teks == "__KELUAR__":
+                    print(f"\n[-] Klien terputus: {pengirim} ({client_address})")
                     print("Admin> ", end="", flush=True)
+                    
+                    # Hapus klien dari memori
+                    del clients[client_address]
+                    
+                    # Umumkan ke sisa klien yang masih ada
+                    pengumuman = f"[SERVER] {pengirim} telah meninggalkan obrolan."
+                    for addr in clients:
+                        server_socket.sendto(pengumuman.encode('utf-8'), addr)
                 
-                # Broadcast ke semua kecuali pengirim
-                for addr in clients:
-                    if addr != client_address:
-                        server_socket.sendto(pesan_lengkap.encode('utf-8'), addr)
+                else:
+                    # --- Pesan Obrolan Normal ---
+                    pesan_lengkap = f"[{pengirim}]: {pesan_teks}"
+                    
+                    klien_lain = len(clients) - 1
+                    if klien_lain > 0:
+                        print(f"\n[Traffic] Pesan dari {pengirim} diteruskan ke {klien_lain} klien.")
+                        print("Admin> ", end="", flush=True)
+                    
+                    for addr in clients:
+                        if addr != client_address:
+                            server_socket.sendto(pesan_lengkap.encode('utf-8'), addr)
             
             # 2. JIKA KLIEN BARU PERTAMA KALI KONEK (Pesan ini adalah Username mereka)
             elif not cek_status_pending(client_address):
@@ -92,9 +106,16 @@ def jalankan_server():
                     print("Admin> ", end="", flush=True)
                     next_pending_id += 1
                 else:
+                    # Mode Public langsung masuk
                     clients[client_address] = username_baru
                     print(f"\n[+] Klien baru bergabung: {username_baru} ({client_address})")
                     print("Admin> ", end="", flush=True)
+                    
+                    # --- [TAMBAHKAN KODE INI] ---
+                    # Kirim pesan balasan (handshake) agar Klien lolos dari batas waktu 5 detik
+                    pesan_selamat = f"[SERVER] Selamat datang di obrolan, {username_baru}!"
+                    server_socket.sendto(pesan_selamat.encode('utf-8'), client_address)
+                    # ---------------------------
                     
                     # Beritahu semua orang bahwa ada yang baru bergabung
                     pengumuman = f"[SERVER] {username_baru} telah bergabung ke dalam obrolan!"

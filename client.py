@@ -82,18 +82,30 @@ receive_thread.start()
 print("\n=== Selamat Datang di Chat UDP ===")
 print("Ketik pesan Anda dan tekan Enter. Ketik 'keluar' untuk berhenti.\n")
 
+# Loop Utama Pengiriman Pesan
 while True:
     try:
         pesan_keluar = input(f"[{USERNAME}]> ")
         
         if pesan_keluar.lower() == 'keluar':
             print("Meninggalkan obrolan...")
+            # --- TAMBAHAN: Kirim sinyal rahasia sebelum pergi ---
+            client_socket.sendto("__KELUAR__".encode('utf-8'), (SERVER_HOST, SERVER_PORT))
             client_socket.close()
             os._exit(0) 
             
         if pesan_keluar.strip(): 
             client_socket.sendto(pesan_keluar.encode('utf-8'), (SERVER_HOST, SERVER_PORT))
             
+    except KeyboardInterrupt:
+        # Menangani jika pengguna keluar paksa menggunakan Ctrl+C
+        print("\nKeluar secara paksa...")
+        try:
+            # --- TAMBAHAN: Tetap kirim sinyal sebelum mati paksa ---
+            client_socket.sendto("__KELUAR__".encode('utf-8'), (SERVER_HOST, SERVER_PORT))
+        except:
+            pass
+        os._exit(0)
     except Exception as e:
         print(f"\n[!] Error Pengiriman: {e}")
         os._exit(1)
