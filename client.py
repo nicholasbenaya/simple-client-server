@@ -2,6 +2,17 @@ import socket
 import threading
 import sys
 
+
+
+def dapatkan_ip_lokal():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80)) 
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
 def jalankan_menu_utama():
     while True:
         print("\n" + "="*40)
@@ -43,7 +54,16 @@ def mulai_sesi_obrolan(mode_jaringan):
 
     print(f"\n[*] Menyiapkan koneksi ke {SERVER_HOST}:{SERVER_PORT}...")
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # --- TAMBAHKAN BLOK KODE INI ---
+    # Memaksa klien untuk menggunakan IP Wi-Fi asli, bukan IP Virtual WSL
+    if mode_jaringan == '2':
+        ip_asli_klien = dapatkan_ip_lokal()
+        # Menggunakan port 0 agar Windows yang mencarikan port kosong secara acak
+        client_socket.bind((ip_asli_klien, 0)) 
+        print(f"[*] Terkunci pada jalur Wi-Fi Klien: {ip_asli_klien}")
+    # -------------------------------
     koneksi_aktif = True # Bendera (Flag) pengatur jalannya obrolan
+    
 
     # --- HANDSHAKE (Validasi Koneksi) ---
     print("Menyambungkan ke server... (Menunggu konfirmasi)")
