@@ -1,16 +1,28 @@
 import socket
 
+def dapatkan_ip_lokal():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80)) 
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
 HOST = '0.0.0.0'
-PORT = 9000 # Using port 9000 for our custom DNS
+PORT = 9000 
+IP_PUBLIK = dapatkan_ip_lokal()
 
 dns_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 dns_socket.bind((HOST, PORT))
-
-# Dictionary to store registered servers: { "ServerName": ("IP", Port) }
 registry = {}
 
-print(f"[*] DNS Server is actively running on Port {PORT}...")
-print("[*] Waiting for server registrations or client queries...\n")
+print("="*50)
+print(f"[*] DNS SERVER BERJALAN DI IP : {IP_PUBLIK}")
+print(f"[*] PORT DNS                  : {PORT}")
+print("="*50)
+print("[*] Menunggu registrasi atau pencarian otomatis (Broadcast)...\n")
 
 while True:
     try:
@@ -19,17 +31,20 @@ while True:
         parts = message.split('|')
         command = parts[0]
 
-        if command == 'REGISTER':
-            # Format: REGISTER|Name|IP|Port
-            name = parts[1]
-            ip = parts[2]
-            port = int(parts[3])
+        # --- FITUR BARU: Menjawab teriakan Broadcast ---
+        if command == 'DISCOVER_DNS':
+            # Membalas ke pengirim agar mereka tahu IP kita
+            dns_socket.sendto("I_AM_DNS".encode('utf-8'), addr)
+            print(f"[>] Menjawab pencarian otomatis dari {addr[0]}")
+        # -----------------------------------------------
+
+        elif command == 'REGISTER':
+            name, ip, port = parts[1], parts[2], int(parts[3])
             registry[name] = (ip, port)
-            print(f"[+] Registered New Server: '{name}' at {ip}:{port}")
+            print(f"[+] Server Terdaftar: '{name}' di {ip}:{port}")
             dns_socket.sendto("OK".encode('utf-8'), addr)
 
         elif command == 'GET_LIST':
-            # Format: GET_LIST
             if not registry:
                 dns_socket.sendto("EMPTY".encode('utf-8'), addr)
             else:
@@ -37,7 +52,6 @@ while True:
                 dns_socket.sendto(f"LIST|{names}".encode('utf-8'), addr)
 
         elif command == 'RESOLVE':
-            # Format: RESOLVE|Name
             name = parts[1]
             if name in registry:
                 ip, port = registry[name]
@@ -46,4 +60,4 @@ while True:
                 dns_socket.sendto("NOT_FOUND".encode('utf-8'), addr)
 
     except Exception as e:
-        print(f"[!] DNS Error: {e}")
+        print(f"[!] Error DNS: {e}")
