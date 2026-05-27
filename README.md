@@ -1,105 +1,79 @@
-# 💬 Python UDP Chat Room (Advanced)
+# 💬 Python UDP Chat Room with Custom DNS
 
-Sebuah aplikasi obrolan (*chat*) berbasis *command-line* (CLI) yang persisten dan tangguh, dibangun murni menggunakan protokol jaringan UDP di Python. Proyek ini mendemonstrasikan implementasi *socket programming*, manajemen status klien (*state management*), sistem *graceful shutdown*, konfigurasi jaringan *on-the-fly*, dan pemantauan lalu lintas.
+Sebuah ekosistem aplikasi obrolan (*chat*) CLI tingkat lanjut, dibangun murni menggunakan protokol jaringan UDP di Python. Proyek ini bukan hanya sekadar obrolan, melainkan mendemonstrasikan ekosistem *Service Discovery* otomatis tanpa konfigurasi rumit (*Zero-Config*).
 
 ---
 
 ## ✨ Fitur Utama
 
-- **Arsitektur Cepat & Ringan (UDP):** Memanfaatkan protokol UDP (*User Datagram Protocol*) untuk pengiriman pesan instan dengan latensi minimal.
-- **Siklus Hidup Klien yang Persisten:** Klien memiliki Menu Utama interaktif. Jika terputus dari server, klien tidak akan *crash*, melainkan kembali ke Menu Utama.
-- **Graceful Shutdown:** Saat Server dimatikan, Server akan menyiarkan sinyal penutupan ke seluruh klien agar mereka terputus secara aman dan elegan.
-- **Sistem Identitas & Hotkey:** - Pengguna diwajibkan mendaftarkan *username* sebelum masuk.
-  - Menggunakan kombinasi tombol **`Ctrl + C`** untuk keluar dari ruang obrolan secara aman (kembali ke Menu Utama).
-- **Port Dinamis & Multiserver:** Mendukung inisiasi banyak server secara simultan di dalam satu mesin fisik yang sama.
-- **Keamanan Ruang Obrolan (On-the-Fly Config):**
-  - 🌍 **Public Mode:** Pengguna dapat langsung terhubung.
-  - 🔒 **Private Mode:** Pengguna ditahan di *Waiting Room* hingga mendapat persetujuan (*Admission*).
-  - *Status keamanan dapat diubah oleh Admin kapan saja tanpa perlu me-restart Server.*
-- **Cross-Platform:** Kompatibel penuh untuk Windows, macOS, maupun Linux (termasuk WSL).
+- **Arsitektur Cepat & Ringan:** Menggunakan *User Datagram Protocol* (UDP) untuk pengiriman instan.
+- **Sistem DNS Khusus (Service Discovery):** Dilengkapi `dns_server.py` yang bertindak sebagai buku telepon. 
+  - Klien dan Server akan menemukan IP DNS secara otomatis menggunakan teknik **UDP Broadcasting**.
+  - Pengguna hanya perlu mengingat "Nama Ruang Obrolan" (misal: *Lobby-A*), bukan IP dan Port.
+- **Siklus Hidup Klien & Hotkey:** Klien tidak mati saat *disconnect*, melainkan kembali ke Menu Utama. Keluar ruang obrolan menggunakan kombinasi tombol `Ctrl + C`.
+- **Keamanan Dinamis (*On-the-Fly*):** Admin dapat mengubah keamanan (*Public* atau *Private*) seketika saat server sedang berjalan.
+- **Manajemen Server (Graceful Shutdown):** Saat Server utama atau DNS dimatikan, mereka akan memutus memori klien dengan aman tanpa menyebabkan *crash*.
 
 ---
 
-## ⚙️ Persyaratan Sistem
+## 🚀 Panduan Eksekusi Program (Berurutan)
 
-Aplikasi ini tidak memerlukan instalasi *library* eksternal. Anda hanya membutuhkan:
-- **Python 3.6+** terinstal di mesin Anda.
+Anda kini memiliki 3 komponen. Jalankan secara berurutan di terminal yang berbeda.
 
----
-
-## 🚀 Panduan Penggunaan
-
-### 1. Menjalankan Server
-Buka terminal/Command Prompt, lalu jalankan:
+### Langkah 1: Jalankan DNS Server
+Program ini adalah fondasi yang menghubungkan nama obrolan dengan IP asli.
 ```bash
-# Pengguna Windows:
-python server.py 
-
-# Pengguna Linux / WSL / macOS:
-python3 server.py
+python dns_server.py
 ```
-**Langkah Inisialisasi:**
-1. Pilih **Mode Jaringan**: `1` untuk *Localhost* atau `2` untuk jaringan ril (LAN/Wi-Fi).
-2. Masukkan **Port**: (misal: `5000`).
-3. Pilih **Tingkat Keamanan**: `1` (*Public*) atau `2` (*Private*).
+> **Catatan:** DNS akan berjalan di latar belakang dan memiliki panel khusus untuk mereset daftar atau mematikan DNS.
 
-### 2. Menjalankan Klien
-Buka terminal baru di komputer yang sama atau komputer lain di jaringan yang sama, lalu jalankan:
+### Langkah 2: Jalankan Chat Server
+Buka terminal baru, lalu inisialisasi ruang obrolan Anda.
 ```bash
-# Pengguna Windows:
+python server.py
+```
+**Langkah Konfigurasi:**
+1. Atur mode (Lokal/Ril) dan keamanan (Public/Private).
+2. Saat ditanya tentang **DNS**, pilih `y` (ya).
+3. Server akan mendeteksi DNS secara gaib. Masukkan **Nama Ruang Obrolan** Anda (misal: `Ruang-Game`).
+
+### Langkah 3: Jalankan Chat Client
+Buka terminal baru di laptop Anda atau laptop teman (dalam 1 jaringan Wi-Fi/Hotspot).
+```bash
 python client.py
-
-# Pengguna Linux / WSL / macOS:
-python3 client.py
 ```
-**Navigasi Menu:**
-1. Anda akan disambut oleh **Menu Utama**. Pilih mode jaringan yang sesuai.
-2. Masukkan **IP Address Server** dan **Port Server**.
-3. Masukkan **Username** Anda.
-4. Saat berada di dalam ruang obrolan, tekan **`Ctrl + C`** kapan saja untuk keluar dan kembali ke Menu Utama. Pilih opsi `3` di Menu Utama jika ingin menutup aplikasi sepenuhnya.
+**Langkah Konfigurasi:**
+1. Pilih opsi **2** (*Cari Ruang Obrolan via DNS*).
+2. Klien akan mendeteksi DNS, mengambil daftar ruang obrolan yang aktif, dan menampilkannya di layar.
+3. Ketikkan nama ruang obrolan (misal: `Ruang-Game`) untuk masuk.
 
 ---
 
-## 🛠️ Panel Perintah Admin (Server)
+## 🛠️ Panel Perintah Admin
 
-Ketikkan perintah berikut langsung di terminal Server untuk mengontrol ekosistem obrolan secara *real-time*:
-
-| Perintah | Deskripsi Fungsi |
+### DNS Admin (`dns_server.py`)
+| Perintah | Deskripsi |
 | :--- | :--- |
-| `status` | Menampilkan daftar klien yang sedang *online* dan klien di *Waiting Room*. |
-| `izin <ID>` | Memberikan akses masuk kepada klien di ruang tunggu (Khusus *Private*). |
-| `tolak <ID>`| Menolak akses klien secara paksa dari ruang tunggu. |
-| `mode public` | Mengubah keamanan server menjadi *Public* seketika. Klien baru langsung masuk. |
-| `mode private`| Mengubah keamanan server menjadi *Private* seketika. Klien baru butuh izin. |
-| `stop` | Mengirim sinyal pemutusan ke semua klien dan mematikan server dengan aman. |
+| `status` | Menampilkan semua ruang obrolan dan IP yang terdaftar saat ini. |
+| `reset` | Menghapus semua nama yang terdaftar dari memori tanpa mematikan program. |
+| `stop` | Mematikan sistem DNS. |
+
+### Chat Admin (`server.py`)
+| Perintah | Deskripsi |
+| :--- | :--- |
+| `status` | Melihat IP Klien yang *online* maupun Klien di *Waiting Room*. |
+| `izin <ID>` / `tolak <ID>` | Memberikan akses atau menolak akses klien (Mode Private). |
+| `mode public` / `mode private` | Mengubah sistem keamanan secara *live*. |
+| `stop` | Mengirim sinyal pemutusan ke semua Klien dan mematikan server. |
 
 ---
 
-## 🔍 Cara Membuktikan Protokol UDP
+## 🐛 Troubleshooting & Tips Jaringan
 
-Anda dapat memverifikasi secara langsung melalui sistem operasi bahwa program ini benar-benar berjalan di jalur UDP (bukan TCP).
-1. Pastikan program `server.py` sedang berjalan (misalnya pada port `5000`).
-2. Buka terminal atau Command Prompt **baru**.
-3. Jalankan perintah pelacak jaringan di bawah ini:
-
-```bash
-# Untuk pengguna Windows (Command Prompt / PowerShell):
-netstat -an | findstr 5000
-
-# Untuk pengguna Linux / macOS / WSL:
-netstat -an | grep 5000
-```
-**Hasil yang Diharapkan:** Anda akan melihat baris output yang diawali dengan kata **`UDP`** (Contoh: `UDP 0.0.0.0:5000 *:*`). Ini membuktikan secara mutlak bahwa kurir data yang digunakan adalah *User Datagram Protocol*.
-
----
-
-## 🐛 Troubleshooting (Pemecahan Masalah)
-
-- **Klien tersangkut pada pesan "Menunggu konfirmasi" lalu terputus**
-  Pastikan Anda telah memasukkan IP dan Port yang benar. Jika Anda menggunakan beda komputer, pastikan Anda mematikan (*Turn Off*) **Windows Defender Firewall** sementara di laptop Server, karena Windows secara *default* memblokir lalu lintas UDP yang masuk.
-- **Klien mengirim pesan tapi tidak sampai (Miskomunikasi Subnet)**
-  Jika Anda menggunakan Docker/VirtualBox, IP yang terdeteksi server mungkin adalah IP Virtual. Pastikan menggunakan IP asli Wi-Fi/LAN dengan mengecek `ipconfig` (Windows) atau `ifconfig` (Linux) secara manual.
-- **Tidak dapat terhubung di Wi-Fi Kampus/Kafe (AP Isolation)**
-  Banyak jaringan publik memblokir komunikasi *peer-to-peer* (AP Isolation) atau *port* non-standar. Solusi terbaik adalah menggunakan *Mobile Hotspot* (Tethering) dari ponsel untuk menguji koneksi antar dua laptop.
-- **Error: Perintah tidak dikenali di Terminal (Windows)**
-  Pastikan Python telah ditambahkan ke PATH *Environment Variables*. Atau, gunakan perintah `py` alih-alih `python`.
+1. **Broadcast UDP Gagal / DNS Tidak Ditemukan:** Fitur penemuan otomatis menggunakan alamat *Broadcast* (`255.255.255.255`). Jika DNS tidak terdeteksi:
+   - Pastikan Anda menggunakan **Mobile Hotspot** pribadi (hindari Wi-Fi kampus karena memiliki fitur isolasi AP).
+   - Pastikan **Windows Defender Firewall** dimatikan pada Profil **Private** maupun **Public**.
+2. **Klien / Server Bingung Memilih IP (Masalah WSL/Docker):**
+   Program sudah dilengkapi fitur penguncian (*bind*) ke kartu Wi-Fi asli. Namun jika masih gagal, matikan sementara *Virtual Adapter* (seperti `vEthernet` atau `VirtualBox`) di menu `ncpa.cpl` pada OS Windows.
+3. **Pembuktian UDP Protocol:**
+   Gunakan perintah `netstat -an | findstr <PORT>` (Windows) atau `netstat -an | grep <PORT>` (Linux). Anda akan melihat tulisan `UDP` berdampingan dengan *port* yang Anda pakai.
