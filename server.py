@@ -24,7 +24,6 @@ print("\n=== PENGATURAN KEAMANAN ===")
 print("1. PUBLIC (Klien bisa langsung bergabung)")
 print("2. PRIVATE (Admin harus memberikan izin)")
 pilihan_keamanan = input("Pilih keamanan (1 atau 2): ").strip()
-
 is_private = (pilihan_keamanan == '2')
 
 if pilihan_jaringan == '1':
@@ -33,6 +32,26 @@ if pilihan_jaringan == '1':
 else:
     HOST = '0.0.0.0' 
     ip_tampil = dapatkan_ip_lokal()
+
+# --- NEW FEATURE: DNS REGISTRATION ---
+print("\n=== PENGATURAN DNS (NAMA SERVER) ===")
+pakai_dns = input("Daftarkan server ini ke DNS? (y/n): ").strip().lower()
+if pakai_dns == 'y':
+    dns_ip = input("Masukkan IP dari DNS Server: ").strip()
+    nama_server = input("Masukkan Nama Unik untuk ruang obrolan ini (misal: Lobby-A): ").strip()
+    
+    try:
+        # Send registration packet to DNS server on port 9000
+        s_dns = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s_dns.settimeout(2.0)
+        s_dns.sendto(f"REGISTER|{nama_server}|{ip_tampil}|{PORT}".encode('utf-8'), (dns_ip, 9000))
+        resp, _ = s_dns.recvfrom(1024)
+        if resp.decode('utf-8') == 'OK':
+            print(f"[*] Berhasil terdaftar di DNS dengan nama: {nama_server}")
+        s_dns.close()
+    except Exception as e:
+        print(f"[!] Gagal menghubungi DNS: {e}")
+# --------------------------------------
 
 print("\n" + "="*50)
 print(f"[*] SERVER AKTIF DI: {ip_tampil}:{PORT}")
@@ -51,8 +70,7 @@ server_berjalan = True
 
 def cek_status_pending(address):
     for addr, uname in pending_clients.values():
-        if addr == address:
-            return True
+        if addr == address: return True
     return False
 
 def jalankan_server():
@@ -64,12 +82,10 @@ def jalankan_server():
             
             if client_address in clients:
                 pengirim = clients[client_address]
-                
                 if pesan_teks == "__KELUAR__":
                     print(f"\n[-] Klien terputus: {pengirim} ({client_address[0]}:{client_address[1]})")
                     print("Admin> ", end="", flush=True)
                     del clients[client_address]
-                    
                     for addr in clients:
                         server_socket.sendto(f"[SERVER] {pengirim} telah meninggalkan obrolan.".encode('utf-8'), addr)
                 else:
@@ -80,11 +96,9 @@ def jalankan_server():
             
             elif not cek_status_pending(client_address):
                 username_baru = pesan_teks 
-                
                 if is_private:
                     pending_clients[next_pending_id] = (client_address, username_baru)
                     server_socket.sendto("[SERVER] Anda berada di ruang tunggu. Menunggu izin Admin...".encode('utf-8'), client_address)
-                    
                     print(f"\n[!] ADMISSION: Klien '{username_baru}' (ID {next_pending_id}) dari IP {client_address[0]}:{client_address[1]} ingin bergabung!")
                     print("Admin> ", end="", flush=True)
                     next_pending_id += 1
@@ -92,16 +106,13 @@ def jalankan_server():
                     clients[client_address] = username_baru
                     print(f"\n[+] Klien bergabung: {username_baru} dari IP {client_address[0]}:{client_address[1]}")
                     print("Admin> ", end="", flush=True)
-                    
                     server_socket.sendto(f"[SERVER] Selamat datang di obrolan, {username_baru}!".encode('utf-8'), client_address)
                     for addr in clients:
                         if addr != client_address:
                             server_socket.sendto(f"[SERVER] {username_baru} bergabung!".encode('utf-8'), addr)
                     
-        except socket.timeout:
-            continue 
-        except Exception:
-            pass
+        except socket.timeout: continue 
+        except Exception: pass
 
 thread_server = threading.Thread(target=jalankan_server)
 thread_server.daemon = True
@@ -119,38 +130,24 @@ while True:
     if perintah == 'stop':
         print("[*] Mematikan server. Memutuskan semua klien...")
         pesan_stop = "__SERVER_STOP__".encode('utf-8')
-        for addr in list(clients.keys()):
-            server_socket.sendto(pesan_stop, addr)
-        for data in pending_clients.values():
-            server_socket.sendto(pesan_stop, data[0]) 
-        
+        for addr in list(clients.keys()): server_socket.sendto(pesan_stop, addr)
+        for data in pending_clients.values(): server_socket.sendto(pesan_stop, data[0]) 
         server_berjalan = False   
         server_socket.close()     
         sys.exit(0)
-        
     elif perintah == 'mode public':
         is_private = False
-        print("[*] Server sekarang beroperasi di mode PUBLIC. Klien baru langsung masuk.")
-        
+        print("[*] Server sekarang beroperasi di mode PUBLIC.")
     elif perintah == 'mode private':
         is_private = True
-        print("[*] Server sekarang beroperasi di mode PRIVATE. Klien baru butuh Admission.")
-        
+        print("[*] Server sekarang beroperasi di mode PRIVATE.")
     elif perintah == 'status':
-        # --- PERUBAHAN TAMPILAN STATUS ADA DI SINI ---
         print(f"\n--- STATUS ({'PRIVATE' if is_private else 'PUBLIC'}) ---")
-        
         print(f"Klien Aktif ({len(clients)}):")
-        # addr[0] adalah IP (misal 192.168.1.5), addr[1] adalah Port Klien (misal 53123)
-        for addr, uname in clients.items(): 
-            print(f" - [{uname}] terhubung dari {addr[0]}:{addr[1]}")
-            
+        for addr, uname in clients.items(): print(f" - [{uname}] terhubung dari {addr[0]}:{addr[1]}")
         print(f"\nKlien Menunggu ({len(pending_clients)}):")
-        for id_tunggu, data in pending_clients.items(): 
-            # data[1] adalah username, data[0] adalah addr (IP dan Port)
-            print(f" - ID {id_tunggu} : [{data[1]}] dari {data[0][0]}:{data[0][1]}")
+        for id_tunggu, data in pending_clients.items(): print(f" - ID {id_tunggu} : [{data[1]}] dari {data[0][0]}:{data[0][1]}")
         print("---------------------\n")
-        
     elif perintah.startswith('izin '):
         try:
             id_target = int(perintah.split(' ')[1])
@@ -160,13 +157,9 @@ while True:
                 server_socket.sendto(f"[SERVER] [DISETUJUI] Selamat datang, {uname}!".encode('utf-8'), addr)
                 print(f"[*] Klien '{uname}' diizinkan masuk.")
                 for client_addr in clients:
-                    if client_addr != addr:
-                        server_socket.sendto(f"[SERVER] {uname} bergabung!".encode('utf-8'), client_addr)
-            else:
-                print("[!] ID tidak ditemukan.")
-        except:
-            pass
-            
+                    if client_addr != addr: server_socket.sendto(f"[SERVER] {uname} bergabung!".encode('utf-8'), client_addr)
+            else: print("[!] ID tidak ditemukan.")
+        except: pass
     elif perintah.startswith('tolak '):
         try:
             id_target = int(perintah.split(' ')[1])
@@ -174,5 +167,4 @@ while True:
                 addr, uname = pending_clients.pop(id_target)
                 server_socket.sendto("[SERVER] [DITOLAK] Akses ditolak oleh Admin.".encode('utf-8'), addr)
                 print(f"[*] Klien '{uname}' ditolak.")
-        except:
-            pass
+        except: pass
