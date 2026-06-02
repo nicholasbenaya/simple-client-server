@@ -9,7 +9,6 @@ def dapatkan_ip_lokal():
         return s.getsockname()[0]
     except: return "127.0.0.1"
 
-# --- FUNGSI AUTO-DISCOVERY UNTUK KLIEN ---
 def temukan_dns_server():
     print("\n[*] Mencari DNS Server di jaringan secara otomatis...")
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -22,11 +21,8 @@ def temukan_dns_server():
             print(f"[+] DNS Server otomatis ditemukan di IP: {addr[0]}!")
             s.close()
             return addr[0]
-    except socket.timeout:
-        print("[!] DNS Server tidak ditemukan.")
-    s.close()
-    return None
-# ----------------------------------------
+    except socket.timeout: print("[!] DNS Server tidak ditemukan.")
+    s.close(); return None
 
 def jalankan_menu_utama():
     while True:
@@ -39,63 +35,43 @@ def jalankan_menu_utama():
         
         try:
             pilihan = input("Pilih menu (1/2/3): ").strip()
-            
-            if pilihan == '3':
-                sys.exit(0) 
-                
+            if pilihan == '3': sys.exit(0) 
             elif pilihan == '1':
                 host = input("Masukkan IP Server: ").strip()
                 port = int(input("Masukkan Port Server: ").strip())
                 mulai_sesi_obrolan(host, port) 
-                
             elif pilihan == '2':
-                # Memanggil DNS secara otomatis, Anda tidak perlu mengetik IP lagi!
                 dns_ip = temukan_dns_server()
-                
-                if not dns_ip:
-                    print("\n[!] Kembali ke menu utama karena DNS tidak ditemukan.")
-                    continue
-                
+                if not dns_ip: continue
                 try:
                     s_dns = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     s_dns.settimeout(3.0)
-                    
                     s_dns.sendto("GET_LIST".encode('utf-8'), (dns_ip, 9000))
                     data, _ = s_dns.recvfrom(1024)
                     respon = data.decode('utf-8')
-                    
                     if respon == "EMPTY":
                         print("\n[!] Belum ada ruang obrolan yang terdaftar di DNS saat ini.")
                         continue
-                        
                     elif respon.startswith("LIST|"):
                         names = respon.split('|')[1].split(',')
                         print("\n--- DAFTAR RUANG OBROLAN TERSEDIA ---")
-                        for n in names:
-                            print(f"  > {n}")
+                        for n in names: print(f"  > {n}")
                         print("-------------------------------------")
                         
                         target_name = input("\nKetik nama ruang obrolan yang ingin dimasuki: ").strip()
-                        
                         s_dns.sendto(f"RESOLVE|{target_name}".encode('utf-8'), (dns_ip, 9000))
                         data2, _ = s_dns.recvfrom(1024)
                         respon2 = data2.decode('utf-8')
-                        
                         if respon2.startswith("RES|"):
                             parts = respon2.split('|')
                             resolved_ip = parts[1]
                             resolved_port = int(parts[2])
                             print(f"[*] Menghubungkan ke {target_name}...")
-                            
                             mulai_sesi_obrolan(resolved_ip, resolved_port)
-                        else:
-                            print(f"\n[!] Nama '{target_name}' tidak ditemukan di DNS.")
-                except Exception as e:
-                    print(f"\n[!] Terjadi kesalahan komunikasi DNS: {e}")
-            else:
-                print("[!] Pilihan tidak valid.")
-        except KeyboardInterrupt:
-            sys.exit(0)
+                        else: print(f"\n[!] Nama '{target_name}' tidak ditemukan di DNS.")
+                except Exception as e: print(f"\n[!] Kesalahan DNS: {e}")
+            else: print("[!] Pilihan tidak valid.")
+        except KeyboardInterrupt: sys.exit(0)
 
 def mulai_sesi_obrolan(SERVER_HOST, SERVER_PORT):
     while True:
@@ -105,8 +81,13 @@ def mulai_sesi_obrolan(SERVER_HOST, SERVER_PORT):
     print(f"\n[*] Menyiapkan koneksi ke ruang obrolan...")
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     
-    try: client_socket.bind((dapatkan_ip_lokal(), 0)) 
+    # --- FITUR BARU: MENCEGAH BENTROKAN KARTU JARINGAN (LOCALHOST FIX) ---
+    try: 
+        if str(SERVER_HOST) != '127.0.0.1':
+            # Hanya paksa bind ke adapter Wi-Fi jika tujuannya bukan Localhost
+            client_socket.bind((dapatkan_ip_lokal(), 0)) 
     except: pass
+    # ---------------------------------------------------------------------
 
     koneksi_aktif = True 
     print("Menyambungkan ke server... (Menunggu konfirmasi)")
@@ -123,11 +104,9 @@ def mulai_sesi_obrolan(SERVER_HOST, SERVER_PORT):
         client_socket.settimeout(1.0) 
     except socket.timeout:
         print("\n[!] Gagal terhubung: Server tidak merespons.")
-        client_socket.close()
-        return
+        client_socket.close(); return
     except Exception as e:
-        client_socket.close()
-        return
+        client_socket.close(); return
 
     def receive_messages():
         nonlocal koneksi_aktif
@@ -138,18 +117,15 @@ def mulai_sesi_obrolan(SERVER_HOST, SERVER_PORT):
                 if pesan_masuk == "__SERVER_STOP__":
                     print("\n\n[!] KONEKSI TERPUTUS: Server telah dimatikan.")
                     print("[!] Tekan ENTER untuk kembali.")
-                    koneksi_aktif = False
-                    break
+                    koneksi_aktif = False; break
                 if "[DITOLAK]" in pesan_masuk:
                     print(f"\n\n{pesan_masuk}")
-                    koneksi_aktif = False
-                    break
+                    koneksi_aktif = False; break
                 print(f"\r{pesan_masuk}\n[{USERNAME}]> ", end="", flush=True)
             except socket.timeout: continue 
             except Exception:
                 if koneksi_aktif: print("\n[!] Terputus dari server.")
-                koneksi_aktif = False
-                break
+                koneksi_aktif = False; break
 
     receive_thread = threading.Thread(target=receive_messages)
     receive_thread.daemon = True
@@ -169,8 +145,7 @@ def mulai_sesi_obrolan(SERVER_HOST, SERVER_PORT):
             print("\n\n[*] Meninggalkan ruang obrolan...")
             try: client_socket.sendto("__KELUAR__".encode('utf-8'), (SERVER_HOST, SERVER_PORT))
             except: pass
-            koneksi_aktif = False
-            break 
+            koneksi_aktif = False; break 
     client_socket.close()
 
 if __name__ == "__main__":
